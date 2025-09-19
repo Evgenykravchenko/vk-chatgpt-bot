@@ -252,7 +252,7 @@ class OpenAIService:
                 # Закрываем старый клиент
                 try:
                     await old_client.close()
-                except:
+                except Exception:
                     pass
 
                 logger.info(f"Успешно переключено на прокси: {proxy_url}")
@@ -297,7 +297,7 @@ class OpenAIService:
                 # Закрываем старый клиент
                 try:
                     await old_client.close()
-                except:
+                except Exception:
                     pass
 
                 logger.info("Успешно переключено на прямое соединение")
