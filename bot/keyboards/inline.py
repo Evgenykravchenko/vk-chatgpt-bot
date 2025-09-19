@@ -2,7 +2,7 @@
 Клавиатуры для VK бота
 """
 import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 
 class VKKeyboard:
@@ -347,16 +347,7 @@ def get_user_input_keyboard() -> str:
     return keyboard.get_keyboard()
 
 
-# Обновите существующую функцию get_cancel_keyboard:
-def get_cancel_keyboard() -> str:
-    """Клавиатура только с отменой"""
-    keyboard = VKKeyboard(one_time=False)
 
-    keyboard.add_button("❌ Отмена", "negative", {"command": "admin"})
-    keyboard.add_button("⬅️ Назад", "secondary", {"command": "whitelist"})
-    keyboard.add_row()
-
-    return keyboard.get_keyboard()
 
 
 def get_rate_limit_keyboard() -> str:

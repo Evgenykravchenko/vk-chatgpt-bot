@@ -6,11 +6,11 @@ import logging
 from typing import Dict, Any, Optional
 
 from services import UserService, OpenAIService
-
-logger = logging.getLogger(__name__)
 from repositories.models import MessageRole
 from bot.keyboards import get_main_keyboard
 from bot.middlewares import RateLimitMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 class MessageHandler:
@@ -54,7 +54,7 @@ class MessageHandler:
             }
 
         # Получаем или создаем пользователя
-        user = await self.user_service.get_or_create_user(
+        await self.user_service.get_or_create_user(
             user_id=user_id,
             first_name=user_info.get('first_name'),
             last_name=user_info.get('last_name')

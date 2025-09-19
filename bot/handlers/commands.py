@@ -1,8 +1,7 @@
 """
 Обработчики команд VK бота
 """
-import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from services import UserService, OpenAIService, SettingsService
 from bot.keyboards import (
