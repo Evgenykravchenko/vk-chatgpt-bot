@@ -1,0 +1,49 @@
+# Имя рабочего процесса
+name: Deploy to Server
+
+on:
+  workflow_run:
+    # Запускается после успешного завершения процесса сборки
+    workflows: ["Build and Test"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Deploy to Self-Hosted Runner
+    # Задача будет выполняться на вашем собственном сервере
+    runs-on: self-hosted
+
+    # Запускаем только если сборка была успешной
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      # 1. Клонируем репозиторий, чтобы получить доступ к файлу docker-compose.yml
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Создаем .env файл из секретов и переменных
+      - name: Create .env file
+        run: |
+          echo "VK_TOKEN=${{ secrets.VK_TOKEN }}" > .env
+          echo "GROUP_ID=${{ vars.GROUP_ID }}" >> .env
+          echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+          echo "CONTEXT_SIZE=${{ vars.CONTEXT_SIZE || 10 }}" >> .env
+          echo "DEFAULT_USER_LIMIT=${{ vars.DEFAULT_USER_LIMIT || 50 }}" >> .env
+          echo "ADMIN_USER_ID=${{ vars.ADMIN_USER_ID }}" >> .env
+          echo "OPENAI_MODEL=${{ vars.OPENAI_MODEL || 'gpt-3.5-turbo' }}" >> .env
+          echo "RATE_LIMIT_CALLS=${{ vars.RATE_LIMIT_CALLS || 5 }}" >> .env
+          echo "RATE_LIMIT_PERIOD=${{ vars.RATE_LIMIT_PERIOD || 60 }}" >> .env
+          echo "OPENAI_USE_PROXY=${{ vars.OPENAI_USE_PROXY || 'false' }}" >> .env
+          echo "OPENAI_PROXY_URL=${{ vars.OPENAI_PROXY_URL || '' }}" >> .env
+          echo "OPENAI_PROXY_KEY=${{ secrets.OPENAI_PROXY_KEY || '' }}" >> .env
+
+      # 3. Вход в GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      # 4. Запуск Docker Compose
+      - name: Pull and restart services
+        run: |
+          docker-compose pull
+          docker-compose up -d
