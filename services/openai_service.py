@@ -234,26 +234,7 @@ class OpenAIService:
             old_client = self.client
             old_base_url = self.base_url
             old_use_proxy = self.use_proxy
-            old_api_key = self.api_key
-
-            # Обновляем настройки
-            self.use_proxy = True
-            self.base_url = proxy_url.rstrip('/')
-            if proxy_key:
-                self.api_key = proxy_key
-
-            # Создаем новый клиент
-            self.client = self._create_client()
-
-            # Тестируем соединение
-            test_success, test_message = await self.test_connection()
-
-            if test_success:
-                # Закрываем старый клиент
-                try:
-                    await old_client.close()
-                except:
-                    pass
+                except Exception:
 
                 logger.info(f"Успешно переключено на прокси: {proxy_url}")
                 return True, f"✅ Переключено на прокси: {proxy_url}"
@@ -297,18 +278,7 @@ class OpenAIService:
                 # Закрываем старый клиент
                 try:
                     await old_client.close()
-                except:
-                    pass
-
-                logger.info("Успешно переключено на прямое соединение")
-                return True, "✅ Переключено на прямое соединение к OpenAI"
-            else:
-                # Откатываем изменения при неудаче
-                self.use_proxy = old_use_proxy
-                self.base_url = old_base_url
-                self.client = old_client
-
-                return False, f"❌ Не удалось переключиться на прямое соединение: {test_message}"
+                except Exception:
 
         except Exception as e:
             logger.error(f"Ошибка переключения на прямое соединение: {e}")
