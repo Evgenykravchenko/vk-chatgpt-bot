@@ -3,8 +3,7 @@ Middleware для ограничения частоты запросов
 """
 import time
 import logging
-import asyncio
-from typing import Dict, List, Optional
+from typing import Dict
 from collections import defaultdict, deque
 
 logger = logging.getLogger(__name__)

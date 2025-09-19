@@ -1,8 +1,7 @@
 """
 Сервис управления доступом к боту
 """
-import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime
 
 from repositories.base import BaseAccessControlRepository
@@ -236,7 +235,7 @@ class AccessControlService:
 • Изменений в истории: {stats['history_count']}"""
 
         if stats['mode'] == 'whitelist' and stats['whitelist_count'] > 0:
-            text += f"\n\n📋 Белый список:\n"
+            text += "\n\n📋 Белый список:\n"
             for user_id in stats['whitelist_users'][:10]:  # Показываем первых 10
                 text += f"• {user_id}\n"
 

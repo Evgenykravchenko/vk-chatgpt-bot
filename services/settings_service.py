@@ -1,8 +1,7 @@
 """
 Сервис для управления настройками бота
 """
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Any
 
 from repositories.base import BaseSettingsRepository, BaseUserRepository, BaseContextRepository
 from repositories.models import BotSettings

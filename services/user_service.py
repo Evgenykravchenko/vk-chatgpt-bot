@@ -1,7 +1,6 @@
 """
 Сервис для работы с пользователями
 """
-from datetime import datetime
 from typing import Optional, List
 
 from repositories.base import BaseUserRepository, BaseContextRepository

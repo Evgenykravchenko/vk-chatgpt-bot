@@ -3,7 +3,6 @@
 """
 import asyncio
 import logging
-import threading
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
@@ -12,12 +11,6 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.utils import get_random_id
 
 from config.settings import settings
-from repositories import (
-    MemoryUserRepository,
-    MemoryContextRepository,
-    MemorySettingsRepository,
-    MemoryAccessControlRepository
-)
 from repositories.sqlite_repo import (
     init_db,
     SQLiteUserRepository,
@@ -406,7 +399,7 @@ class VKBot:
     async def _handle_settings_commands(self, user_id: int, command: str) -> Dict[str, Any]:
         """Обработка команд управления настройками"""
         from bot.keyboards import (
-            get_admin_keyboard, get_main_keyboard, get_settings_management_keyboard,
+            get_main_keyboard, get_settings_management_keyboard,
             get_basic_settings_keyboard, get_system_settings_keyboard, get_ai_model_keyboard
         )
 
@@ -691,7 +684,7 @@ class VKBot:
                         active_limits.append(f"Ограничено: {active_count} из {total_active} активных пользователей")
                     elif total_active > 0:
                         active_limits.append(f"Активных пользователей: {total_active}, ограничений нет")
-                except Exception as e:
+                except Exception:
                     active_limits.append("Не удалось получить статистику активных ограничений")
 
             text = f"""📊 Подробная информация Rate Limiting:
@@ -899,7 +892,6 @@ class VKBot:
         from bot.keyboards import (
             get_access_control_keyboard, get_access_mode_keyboard,
             get_whitelist_management_keyboard, get_main_keyboard,
-            get_admin_keyboard, get_confirmation_keyboard,
             get_access_messages_keyboard
         )
         
@@ -1144,8 +1136,7 @@ class VKBot:
     async def _handle_user_state(self, user_id: int, message_text: str) -> Dict[str, Any]:
         """Обработка состояний пользователя (ожидание ввода)"""
         from bot.keyboards import (
-            get_whitelist_management_keyboard, get_settings_management_keyboard,
-            get_basic_settings_keyboard, get_user_management_keyboard, get_admin_keyboard,
+            get_whitelist_management_keyboard, get_basic_settings_keyboard, get_user_management_keyboard, get_admin_keyboard,
             get_rate_limit_keyboard
         )
 
@@ -1336,7 +1327,7 @@ class VKBot:
                 }
             else:
                 return {
-                    "message": f"❌ Ошибка обновления настройки",
+                    "message": "❌ Ошибка обновления настройки",
                     "keyboard": get_basic_settings_keyboard()
                 }
 
