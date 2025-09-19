@@ -66,7 +66,7 @@ class OpenAIService:
         try:
             logger.info(f"Тестирование соединения: {self._get_connection_info()}")
 
-            response = await self.client.chat.completions.create(
+            await self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": "Hi"}],
                 max_tokens=10

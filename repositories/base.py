@@ -3,7 +3,7 @@
 """
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
-from .models import UserProfile, UserContext, BotSettings
+from .models import UserProfile, UserContext, BotSettings, AccessControl
 
 
 class BaseUserRepository(ABC):

@@ -1005,7 +1005,7 @@ class VKBot:
                             text += f"{i}. {name} (ID: {user_id_item})\n"
                         else:
                             text += f"{i}. ID: {user_id_item}\n"
-                    except:
+                    except Exception as e:
                         text += f"{i}. ID: {user_id_item}\n"
                     
                     if i >= 15:  # Ограничиваем вывод

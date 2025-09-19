@@ -370,18 +370,7 @@ def get_rate_limit_keyboard() -> str:
     return keyboard.get_keyboard()
 
 
-def get_system_settings_keyboard() -> str:
-    """Клавиатура системных настроек (обновленная)"""
-    keyboard = VKKeyboard(one_time=False)
 
-    keyboard.add_button("⏱️ Rate Limiting", "secondary", {"command": "rate_limit_menu"})
-    keyboard.add_button("🔧 Обслуживание", "secondary", {"command": "toggle_maintenance"})
-    keyboard.add_row()
-
-    keyboard.add_button("⬅️ Назад", "primary", {"command": "settings_menu"})
-    keyboard.add_row()
-
-    return keyboard.get_keyboard()
 
 
 def get_rate_limit_input_keyboard() -> str:

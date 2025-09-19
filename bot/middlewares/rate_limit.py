@@ -106,47 +106,7 @@ class RateLimitMiddleware:
         self._total_allowed_requests += 1
         return False
 
-    def is_rate_limited(self, user_id: int) -> bool:
-        """
-        DEPRECATED: Синхронная версия для обратной совместимости
-        Используйте await is_rate_limited_async(user_id) вместо этого
-        """
-        logger.warning(
-            "Используется устаревший синхронный метод is_rate_limited. Обновите код для использования await.")
 
-        # Читаем настройки из config напрямую для синхронной версии
-        try:
-            from config.settings import settings
-            rate_settings = {
-                "enabled": True,
-                "calls": settings.rate_limit_calls,
-                "period": settings.rate_limit_period
-            }
-        except ImportError:
-            rate_settings = {"enabled": True, "calls": 5, "period": 60}
-
-        if not rate_settings.get("enabled", True):
-            self._total_allowed_requests += 1
-            return False
-
-        current_time = time.time()
-        user_queue = self.user_requests[user_id]
-
-        # Удаляем старые запросы
-        period = rate_settings.get("period", 60)
-        while user_queue and current_time - user_queue[0] > period:
-            user_queue.popleft()
-
-        # Проверяем количество запросов
-        max_calls = rate_settings.get("calls", 5)
-        if len(user_queue) >= max_calls:
-            self._total_blocked_requests += 1
-            return True
-
-        # Добавляем текущий запрос
-        user_queue.append(current_time)
-        self._total_allowed_requests += 1
-        return False
 
     def get_time_until_reset(self, user_id: int) -> int:
         """
