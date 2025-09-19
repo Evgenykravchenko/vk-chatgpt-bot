@@ -1,0 +1,21 @@
+# Служебные файлы IDE
+.idea/
+
+# Кэш и служебные файлы Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+*.egg-info/
+
+# Файлы окружения (содержат секреты)
+.env
+
+# Локальные базы данных и данные
+data/
+*.sqlite
+identifier.sqlite
+
+# Временные файлы
+commit_message.tmp
