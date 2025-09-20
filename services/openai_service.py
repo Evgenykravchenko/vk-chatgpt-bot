@@ -174,6 +174,61 @@ class OpenAIService:
             logger.error(f"Ошибка парсинга ответа: {e}")
             return "❌ Ошибка обработки ответа от API"
 
+    async def _make_direct_proxy_request(self, request_params: dict) -> str:
+        """
+        Прямой HTTP-запрос к прокси через httpx для обхода проблем с OpenAI клиентом
+        
+        Args:
+            request_params: Параметры запроса
+            
+        Returns:
+            Обработанный ответ
+        """
+        url = f"{self.base_url}/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "VK-ChatGPT-Bot/1.0"
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            try:
+                response = await client.post(url, json=request_params, headers=headers)
+                response.raise_for_status()
+                
+                # Получаем текст ответа
+                response_text = response.text
+                logger.debug(f"Получен ответ от прокси: {len(response_text)} символов")
+                
+                # Пытаемся парсить как JSON
+                try:
+                    response_data = response.json()
+                    if 'choices' in response_data and response_data['choices']:
+                        content = response_data['choices'][0]['message']['content']
+                        logger.debug(f"Получен JSON ответ от прокси длиной {len(content)} символов")
+                        return content.strip()
+                    else:
+                        logger.warning(f"Неожиданная структура JSON: {response_data}")
+                        return "❌ Получен некорректный ответ от прокси"
+                        
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"Не удалось парсить JSON от прокси: {e}")
+                    # Если не JSON, возвращаем как есть
+                    return response_text.strip()
+                    
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Ошибка HTTP от прокси: {e.response.status_code}")
+                raise openai.APIStatusError(f"HTTP {e.response.status_code}", response=e.response, body=None)
+                
+            except httpx.TimeoutException:
+                logger.error("Таймаут запроса к прокси")
+                raise openai.APITimeoutError("Request timeout")
+                
+            except httpx.ConnectError as e:
+                logger.error(f"Ошибка соединения с прокси: {e}")
+                raise openai.APIConnectionError(f"Connection error: {e}")
+
     async def _make_request_with_retry(self, request_params: dict, max_retries: int = 2) -> str:
         """
         Выполнение запроса с повторными попытками при ошибках прокси
@@ -185,44 +240,29 @@ class OpenAIService:
         Returns:
             Обработанный ответ
         """
-        last_error = None
-        
-        for attempt in range(max_retries + 1):
-            try:
-                if attempt > 0:
-                    logger.info(f"Повторная попытка {attempt}/{max_retries}")
-                
-                response = await self.client.chat.completions.create(**request_params)
-                return self._parse_response(response)
-                
-            except AttributeError as e:
-                if "'NoneType' object has no attribute 'split'" in str(e):
-                    last_error = e
+        # Используем прямой HTTP-запрос для прокси чтобы избежать проблем с OpenAI клиентом
+        if self.use_proxy:
+            for attempt in range(max_retries + 1):
+                try:
+                    if attempt > 0:
+                        logger.info(f"Повторная попытка {attempt}/{max_retries}")
+                    
+                    return await self._make_direct_proxy_request(request_params)
+                    
+                except (openai.APIConnectionError, openai.APITimeoutError, httpx.ConnectError, httpx.TimeoutException) as e:
                     if attempt < max_retries:
-                        logger.warning(f"Ошибка прокси (попытка {attempt + 1}): {e}")
+                        logger.warning(f"Ошибка соединения с прокси (попытка {attempt + 1}): {e}")
                         continue
                     else:
-                        logger.error(f"Ошибка парсинга ответа от прокси после {max_retries + 1} попыток: {e}")
-                        return "❌ Прокси-сервер вернул некорректный ответ. Попробуйте еще раз или переключитесь на прямое соединение."
-                else:
-                    # Не связанная с прокси ошибка атрибута
+                        raise e
+                
+                except Exception as e:
+                    # Любая другая ошибка - пробрасываем дальше
                     raise e
-            
-            except (openai.APIConnectionError, openai.APITimeoutError) as e:
-                last_error = e
-                if attempt < max_retries and self.use_proxy:
-                    logger.warning(f"Ошибка соединения с прокси (попытка {attempt + 1}): {e}")
-                    continue
-                else:
-                    raise e
-            
-            except Exception as e:
-                # Любая другая ошибка - пробрасываем дальше
-                raise e
-        
-        # Если все попытки исчерпаны
-        if last_error:
-            raise last_error
+        else:
+            # Для прямого соединения используем стандартный клиент
+            response = await self.client.chat.completions.create(**request_params)
+            return self._parse_response(response)
 
     async def generate_response(
         self,
@@ -259,12 +299,8 @@ class OpenAIService:
 
             logger.debug(f"Отправка запроса к {'прокси' if self.use_proxy else 'OpenAI'}: {len(messages)} сообщений")
 
-            # Используем метод с повторными попытками для прокси
-            if self.use_proxy:
-                return await self._make_request_with_retry(request_params)
-            else:
-                response = await self.client.chat.completions.create(**request_params)
-                return self._parse_response(response)
+            # Используем метод с повторными попытками
+            return await self._make_request_with_retry(request_params)
 
         except openai.RateLimitError as e:
             logger.warning(f"Rate limit превышен ({'прокси' if self.use_proxy else 'OpenAI'}): {e}")
@@ -299,20 +335,6 @@ class OpenAIService:
             logger.error(f"Общая ошибка API ({'прокси' if self.use_proxy else 'OpenAI'}): {e}")
             return f"❌ Произошла ошибка на стороне {'прокси' if self.use_proxy else 'OpenAI'}."
 
-        except AttributeError as e:
-            if "'NoneType' object has no attribute 'split'" in str(e):
-                logger.error(f"Ошибка парсинга ответа от прокси (отсутствует content-type): {e}")
-                return "❌ Прокси-сервер вернул некорректный ответ. Попробуйте еще раз или переключитесь на прямое соединение."
-            else:
-                logger.error(f"Ошибка атрибута ({'прокси' if self.use_proxy else 'OpenAI'}): {e}", exc_info=True)
-                return "❌ Ошибка обработки ответа от API."
-
-        except Exception as e:
-            logger.error(f"Неожиданная ошибка ({'прокси' if self.use_proxy else 'OpenAI'}): {e}", exc_info=True)
-            if self.use_proxy:
-                return "❌ Неожиданная ошибка при обращении к прокси. Попробуйте еще раз или переключитесь на прямое соединение."
-            else:
-                return "❌ Неожиданная ошибка при обращении к AI."
 
     async def generate_response_from_context(
         self,
