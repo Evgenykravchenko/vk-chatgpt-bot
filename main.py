@@ -60,9 +60,9 @@ class VKBot:
 
         # Инициализация сервисов
         self.user_service = UserService(self.user_repo, self.context_repo)
-        self.openai_service = OpenAIService()
-        self.access_service = AccessControlService(self.access_repo)
         self.settings_service = SettingsService(self.settings_repo, self.user_repo, self.context_repo)
+        self.openai_service = OpenAIService(self.settings_service)  # Передаем settings_service
+        self.access_service = AccessControlService(self.access_repo)
 
         # Инициализация middleware
         self.rate_limiter = RateLimitMiddleware(self.settings_service)
@@ -72,6 +72,7 @@ class VKBot:
         self.message_handler = MessageHandler(
             self.user_service,
             self.openai_service,
+            self.settings_service,
             self.rate_limiter
         )
 
@@ -102,6 +103,10 @@ class VKBot:
     async def start(self):
         """Асинхронный запуск бота и всех фоновых задач."""
         logger.info("🤖 VK OpenAI Bot запускается...")
+
+        # Синхронизируем OpenAI настройки с БД
+        await self.openai_service.sync_with_db_settings()
+        logger.info("✅ OpenAI настройки синхронизированы")
 
         # Запускаем фоновые задачи: прослушивание событий и ежедневный сброс лимитов
         listener_task = asyncio.create_task(self._listen_events())
@@ -823,6 +828,14 @@ class VKBot:
             "toggle_rate_limit", "toggle_maintenance",
             "rate_limit_menu", "show_rate_limit_info", "edit_rate_limit_calls", "edit_rate_limit_period"
         ]
+        
+        # Команды OpenAI подключения
+        openai_commands = [
+            "openai_connection_menu", "set_openai_direct", "set_openai_proxy", 
+            "test_openai_connection", "show_openai_status", "proxy_settings_menu",
+            "show_proxy_examples", "use_vercel_proxy", "test_proxy_connection",
+            "edit_proxy_url", "edit_proxy_key"
+        ]
 
         if command in access_commands:
             return await self._handle_access_control_commands(user_id, command, payload)
@@ -830,6 +843,8 @@ class VKBot:
             return await self._handle_admin_commands(user_id, command, payload)
         elif command in user_manage_commands:
             return await self._handle_user_management_commands(user_id, command, payload)
+        elif command in openai_commands:
+            return await self._handle_openai_commands(user_id, command, payload)
         elif command in settings_commands:
             return await self._handle_settings_commands(user_id, command)
 
@@ -1171,6 +1186,12 @@ class VKBot:
                     "message": "❌ Действие отменено. Возвращаемся в админ панель.",
                     "keyboard": get_admin_keyboard()
                 }
+            elif state in ["edit_proxy_url_input", "edit_proxy_key_input"]:
+                from bot.keyboards.inline import get_openai_connection_menu_keyboard
+                return {
+                    "message": "❌ Действие отменено. Возвращаемся к настройкам OpenAI.",
+                    "keyboard": get_openai_connection_menu_keyboard()
+                }
             else:
                 return {
                     "message": "❌ Действие отменено.",
@@ -1331,6 +1352,23 @@ class VKBot:
                     "keyboard": get_basic_settings_keyboard()
                 }
 
+        # Обработка OpenAI состояний
+        if state in ["edit_proxy_url_input", "edit_proxy_key_input"]:
+            from bot.handlers.openai_handlers import OpenAICommandHandler
+            
+            openai_handler = OpenAICommandHandler(
+                self.user_service,
+                self.openai_service,
+                self.settings_service
+            )
+            
+            del self._user_states[user_id]
+            
+            if state == "edit_proxy_url_input":
+                return await openai_handler.handle_proxy_url_input(user_id, message_text)
+            elif state == "edit_proxy_key_input":
+                return await openai_handler.handle_proxy_key_input(user_id, message_text)
+                
         # Обработка белого списка
         # Пробуем извлечь информацию о пользователе из сообщения
         user_info = self.user_resolver.extract_user_info_from_text(message_text)
@@ -1576,6 +1614,64 @@ class VKBot:
             }
 
         return {"message": "Неизвестная команда.", "keyboard": get_admin_keyboard()}
+    
+    async def _handle_openai_commands(self, user_id: int, command: str, payload: dict = None) -> Dict[str, Any]:
+        """Обработка команд OpenAI подключения"""
+        from bot.handlers.openai_handlers import OpenAICommandHandler
+        from bot.keyboards import get_main_keyboard
+        
+        # Проверяем права админа
+        is_admin = await self.user_service.is_admin(user_id)
+        
+        if not is_admin:
+            return {
+                "message": "❌ У вас нет прав администратора",
+                "keyboard": get_main_keyboard()
+            }
+        
+        # Создаем обработчик OpenAI команд
+        openai_handler = OpenAICommandHandler(
+            self.user_service,
+            self.openai_service,
+            self.settings_service
+        )
+        
+        # Обрабатываем команды
+        if command == "openai_connection_menu":
+            return await openai_handler.handle_openai_connection_menu(user_id)
+        elif command == "set_openai_direct":
+            return await openai_handler.handle_set_openai_direct(user_id)
+        elif command == "set_openai_proxy":
+            return await openai_handler.handle_set_openai_proxy(user_id)
+        elif command == "test_openai_connection":
+            return await openai_handler.handle_test_openai_connection(user_id)
+        elif command == "show_openai_status":
+            return await openai_handler.handle_show_openai_status(user_id)
+        elif command == "proxy_settings_menu":
+            return await openai_handler.handle_proxy_settings_menu(user_id)
+        elif command == "show_proxy_examples":
+            return await openai_handler.handle_show_proxy_examples(user_id)
+        elif command == "use_vercel_proxy":
+            return await openai_handler.handle_use_vercel_proxy(user_id)
+        elif command == "test_proxy_connection":
+            return await openai_handler.handle_test_proxy_connection(user_id)
+        elif command == "edit_proxy_url":
+            result = await openai_handler.handle_edit_proxy_url(user_id)
+            if "next_action" in result:
+                self._user_states[user_id] = result["next_action"]
+                del result["next_action"]  # Убираем из ответа
+            return result
+        elif command == "edit_proxy_key":
+            result = await openai_handler.handle_edit_proxy_key(user_id)
+            if "next_action" in result:
+                self._user_states[user_id] = result["next_action"]
+                del result["next_action"]  # Убираем из ответа
+            return result
+        
+        return {
+            "message": "❓ Неизвестная команда OpenAI",
+            "keyboard": get_main_keyboard()
+        }
     
     def _get_user_info(self, user_id: int) -> Dict[str, Any]:
         """Получение информации о пользователе из VK API"""

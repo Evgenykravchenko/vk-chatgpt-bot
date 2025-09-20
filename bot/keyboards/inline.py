@@ -234,7 +234,7 @@ def get_settings_management_keyboard() -> str:
 
 
 def get_basic_settings_keyboard() -> str:
-    """Клавиатура основных настроек"""
+    """Клавиатура основных настроек (обновленная)"""
     keyboard = VKKeyboard(one_time=False)
 
     keyboard.add_button("💭 Контекст", "secondary", {"command": "edit_context_size"})
@@ -242,6 +242,9 @@ def get_basic_settings_keyboard() -> str:
     keyboard.add_row()
 
     keyboard.add_button("🧠 Модель AI", "secondary", {"command": "edit_ai_model"})
+    keyboard.add_button("🔌 OpenAI подключение", "secondary", {"command": "openai_connection_menu"})
+    keyboard.add_row()
+
     keyboard.add_button("💬 Приветствие", "secondary", {"command": "edit_welcome"})
     keyboard.add_row()
 
@@ -381,4 +384,71 @@ def get_rate_limit_input_keyboard() -> str:
     keyboard.add_button("❌ Отмена", "negative", {"command": "settings_system"})
     keyboard.add_row()
 
+    return keyboard.get_keyboard()
+
+
+# ===== OPENAI CONNECTION KEYBOARDS =====
+
+def get_openai_connection_menu_keyboard() -> str:
+    """Клавиатура меню подключения OpenAI"""
+    keyboard = VKKeyboard(one_time=False)
+
+    keyboard.add_button("🔗 Прямое подключение", "secondary", {"command": "set_openai_direct"})
+    keyboard.add_row()
+
+    keyboard.add_button("🔄 Через прокси", "secondary", {"command": "set_openai_proxy"})
+    keyboard.add_row()
+
+    keyboard.add_button("🔍 Проверить соединение", "secondary", {"command": "test_openai_connection"})
+    keyboard.add_button("📊 Статус подключения", "secondary", {"command": "show_openai_status"})
+    keyboard.add_row()
+
+    keyboard.add_button("⚙️ Настройки прокси", "secondary", {"command": "proxy_settings_menu"})
+    keyboard.add_row()
+
+    keyboard.add_button("⬅️ Назад", "primary", {"command": "settings_basic"})
+    keyboard.add_row()
+
+    return keyboard.get_keyboard()
+
+
+def get_proxy_settings_keyboard() -> str:
+    """Клавиатура настроек прокси"""
+    keyboard = VKKeyboard(one_time=False)
+
+    keyboard.add_button("🌐 Изменить URL", "secondary", {"command": "edit_proxy_url"})
+    keyboard.add_button("🔑 Изменить ключ", "secondary", {"command": "edit_proxy_key"})
+    keyboard.add_row()
+
+    keyboard.add_button("🔍 Тест прокси", "secondary", {"command": "test_proxy_connection"})
+    keyboard.add_button("💡 Примеры URL", "secondary", {"command": "show_proxy_examples"})
+    keyboard.add_row()
+
+    keyboard.add_button("⬅️ Назад", "primary", {"command": "openai_connection_menu"})
+    keyboard.add_row()
+
+    return keyboard.get_keyboard()
+
+
+def get_openai_input_keyboard() -> str:
+    """Клавиатура для ввода настроек OpenAI"""
+    keyboard = VKKeyboard(one_time=False)
+    
+    keyboard.add_button("⬅️ Назад", "secondary", {"command": "openai_connection_menu"})
+    keyboard.add_button("❌ Отмена", "negative", {"command": "settings_basic"})
+    keyboard.add_row()
+    
+    return keyboard.get_keyboard()
+
+
+def get_proxy_examples_keyboard() -> str:
+    """Клавиатура с примерами прокси"""
+    keyboard = VKKeyboard(one_time=False)
+    
+    keyboard.add_button("📋 Использовать Vercel", "positive", {"command": "use_vercel_proxy"})
+    keyboard.add_row()
+    
+    keyboard.add_button("⬅️ Назад", "primary", {"command": "proxy_settings_menu"})
+    keyboard.add_row()
+    
     return keyboard.get_keyboard()

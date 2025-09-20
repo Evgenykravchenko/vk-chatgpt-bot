@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-from services import UserService, OpenAIService
+from services import UserService, OpenAIService, SettingsService
 from repositories.models import MessageRole
 from bot.keyboards import get_main_keyboard
 from bot.middlewares import RateLimitMiddleware
@@ -20,11 +20,16 @@ class MessageHandler:
             self,
             user_service: UserService,
             openai_service: OpenAIService,
+            settings_service: SettingsService,
             rate_limiter: RateLimitMiddleware
     ):
         self.user_service = user_service
         self.openai_service = openai_service
+        self.settings_service = settings_service
         self.rate_limiter = rate_limiter
+        
+        # Словарь для хранения состояний пользователей (ожидания ввода)
+        self.user_states = {}
 
     async def handle_text_message(
             self,
@@ -45,7 +50,11 @@ class MessageHandler:
         Returns:
             Словарь с ответом
         """
-        # Проверяем rate limiting (ИСПРАВЛЕНО: добавлен await)
+        # Проверяем, находится ли пользователь в состоянии ожидания ввода
+        if user_id in self.user_states:
+            return await self._handle_user_input_state(user_id, text)
+        
+        # Проверяем rate limiting
         if await self.rate_limiter.is_rate_limited_async(user_id):
             time_left = await self.rate_limiter.get_time_until_reset_async(user_id)
             return {
@@ -110,6 +119,38 @@ class MessageHandler:
                 "keyboard": get_main_keyboard()
             }
 
+    async def _handle_user_input_state(self, user_id: int, text: str) -> Dict[str, Any]:
+        """Обработка ввода пользователя в состоянии ожидания"""
+        state = self.user_states.get(user_id)
+        if not state:
+            return {
+                "message": "❌ Состояние не найдено",
+                "keyboard": get_main_keyboard()
+            }
+        
+        action = state.get("action")
+        
+        # Импортируем обработчики
+        from .openai_handlers import OpenAICommandHandler
+        openai_handler = OpenAICommandHandler(
+            self.user_service, self.openai_service, self.settings_service
+        )
+        
+        # Очищаем состояние пользователя
+        del self.user_states[user_id]
+        
+        # Обрабатываем ввод в зависимости от действия
+        if action == "edit_proxy_url_input":
+            return await openai_handler.handle_proxy_url_input(user_id, text)
+        elif action == "edit_proxy_key_input":
+            return await openai_handler.handle_proxy_key_input(user_id, text)
+        else:
+            from bot.keyboards.inline import get_openai_connection_menu_keyboard
+            return {
+                "message": "❌ Неизвестное действие",
+                "keyboard": get_openai_connection_menu_keyboard()
+            }
+
     async def handle_button_click(
             self,
             user_id: int,
@@ -132,11 +173,16 @@ class MessageHandler:
         if not command:
             return None
 
-        # Импортируем обработчик команд
-        from .commands import CommandHandler
-        command_handler = CommandHandler(self.user_service, self.openai_service)
+        # Очищаем состояние пользователя при любой команде кнопки
+        if user_id in self.user_states:
+            del self.user_states[user_id]
 
-        # Обрабатываем команды
+        # Импортируем обработчики команд
+        from .commands import CommandHandler
+        
+        command_handler = CommandHandler(self.user_service, self.openai_service, self.settings_service)
+
+        # Основные команды
         if command == "main":
             return {
                 "message": "🏠 Главное меню",
@@ -153,10 +199,10 @@ class MessageHandler:
                 "message": "💬 Напиши свой вопрос, и я отвечу!",
                 "keyboard": get_main_keyboard()
             }
+        elif command == "admin":
+            return await command_handler.handle_admin_panel(user_id)
         elif command == "users" and await self.user_service.is_admin(user_id):
             return await command_handler.handle_users_list(user_id)
-        elif command == "settings" and await self.user_service.is_admin(user_id):
-            return await command_handler.handle_admin_panel(user_id)
         elif command == "commands":
             return await command_handler.handle_help(user_id)
         elif command == "about":
@@ -169,6 +215,7 @@ class MessageHandler:
 • OpenAI GPT для генерации ответов
 • Продвинутая система контекста
 • Система лимитов и статистики
+• Поддержка прокси для обхода блокировок
 
 🔸 **Разработчик:** Кравченко Евгений
 🔸 **Версия:** 1.0.0
@@ -176,6 +223,22 @@ class MessageHandler:
 💻 Бот написан на Python с использованием VK API и OpenAI API.""",
                 "keyboard": get_main_keyboard()
             }
+        
+        # Команды настроек (только для админов)
+        elif command == "settings_basic":
+            from bot.keyboards.inline import get_basic_settings_keyboard
+            return {
+                "message": "🤖 **Основные настройки**\n\nВыберите параметр для настройки:",
+                "keyboard": get_basic_settings_keyboard()
+            }
+        elif command == "settings_menu":
+            from bot.keyboards.inline import get_settings_management_keyboard
+            return {
+                "message": "⚙️ **Управление настройками**",
+                "keyboard": get_settings_management_keyboard()
+            }
+        
+        # Команды OpenAI обрабатываются в main.py
 
         return None
 

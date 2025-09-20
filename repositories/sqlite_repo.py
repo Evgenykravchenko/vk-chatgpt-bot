@@ -223,6 +223,7 @@ class SQLiteSettingsRepository(BaseSettingsRepository):
                     from config.settings import settings
                     needs_update = False
 
+                    # Основные настройки
                     if settings_obj.openai_model != settings.openai_model:
                         settings_obj.openai_model = settings.openai_model
                         needs_update = True
@@ -232,10 +233,30 @@ class SQLiteSettingsRepository(BaseSettingsRepository):
                     if settings_obj.default_user_limit != settings.default_user_limit:
                         settings_obj.default_user_limit = settings.default_user_limit
                         needs_update = True
+                    
+                    # Настройки прокси - синхронизируем с .env
+                    if settings_obj.openai_use_proxy != settings.openai_use_proxy:
+                        settings_obj.openai_use_proxy = settings.openai_use_proxy
+                        needs_update = True
+                    if settings_obj.openai_proxy_url != settings.openai_proxy_url:
+                        settings_obj.openai_proxy_url = settings.openai_proxy_url
+                        needs_update = True
+                    if settings_obj.openai_proxy_key != (settings.openai_proxy_key or ""):
+                        settings_obj.openai_proxy_key = settings.openai_proxy_key or ""
+                        needs_update = True
+                    
+                    # Rate limiting настройки
+                    if settings_obj.rate_limit_calls != settings.rate_limit_calls:
+                        settings_obj.rate_limit_calls = settings.rate_limit_calls
+                        needs_update = True
+                    if settings_obj.rate_limit_period != settings.rate_limit_period:
+                        settings_obj.rate_limit_period = settings.rate_limit_period
+                        needs_update = True
 
                     # Если настройки изменились, сохраняем их
                     if needs_update:
                         await self.update_settings(settings_obj)
+                        logger.info("Настройки синхронизированы с .env файлом")
 
                 except ImportError:
                     pass
@@ -249,10 +270,17 @@ class SQLiteSettingsRepository(BaseSettingsRepository):
                     default_user_limit=settings.default_user_limit,
                     context_size=settings.context_size,
                     openai_model=settings.openai_model,
+                    openai_use_proxy=settings.openai_use_proxy,
+                    openai_proxy_url=settings.openai_proxy_url,
+                    openai_proxy_key=settings.openai_proxy_key or "",
+                    rate_limit_calls=settings.rate_limit_calls,
+                    rate_limit_period=settings.rate_limit_period,
                 )
+                logger.info("Созданы новые настройки на основе .env файла")
             except ImportError:
                 # Дефолтные значения если настройки недоступны
                 new_settings = BotSettings()
+                logger.warning("Используются дефолтные настройки")
 
             # Сохраняем новые настройки в БД
             await self.update_settings(new_settings)

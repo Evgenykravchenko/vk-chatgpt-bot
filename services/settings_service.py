@@ -467,3 +467,144 @@ class SettingsService:
 
         except ValueError:
             return False, None, "Введите корректные числа"
+
+    async def update_proxy_url(self, proxy_url: str, admin_id: int) -> bool:
+        """
+        Обновить URL прокси
+
+        Args:
+            proxy_url: Новый URL прокси
+            admin_id: ID администратора
+
+        Returns:
+            True если обновлено успешно
+        """
+        if not self._is_admin(admin_id):
+            return False
+
+        # Валидация URL
+        if not proxy_url.strip():
+            return False
+
+        if not proxy_url.startswith(("http://", "https://")):
+            return False
+
+        # Очищаем URL от лишних символов
+        clean_url = proxy_url.strip().rstrip('/')
+        if clean_url.endswith('/v1'):
+            clean_url = clean_url[:-3]
+
+        bot_settings = await self.settings_repo.get_settings()
+        bot_settings.update_setting('openai_proxy_url', clean_url)
+        await self.settings_repo.update_settings(bot_settings)
+
+        # Обновляем глобальные настройки
+        from config.settings import settings
+        settings.openai_proxy_url = clean_url
+
+        return True
+
+    async def update_proxy_key(self, proxy_key: str, admin_id: int) -> bool:
+        """
+        Обновить ключ прокси
+
+        Args:
+            proxy_key: Новый ключ прокси (может быть None для очистки)
+            admin_id: ID администратора
+
+        Returns:
+            True если обновлено успешно
+        """
+        if not self._is_admin(admin_id):
+            return False
+
+        bot_settings = await self.settings_repo.get_settings()
+        bot_settings.update_setting('openai_proxy_key', proxy_key)
+        await self.settings_repo.update_settings(bot_settings)
+
+        # Обновляем глобальные настройки
+        from config.settings import settings
+        settings.openai_proxy_key = proxy_key
+
+        return True
+
+    async def update_openai_use_proxy(self, use_proxy: bool, admin_id: int) -> bool:
+        """
+        Обновить режим использования прокси
+
+        Args:
+            use_proxy: Использовать ли прокси
+            admin_id: ID администратора
+
+        Returns:
+            True если обновлено успешно
+        """
+        if not self._is_admin(admin_id):
+            return False
+
+        bot_settings = await self.settings_repo.get_settings()
+        bot_settings.update_setting('openai_use_proxy', use_proxy)
+        await self.settings_repo.update_settings(bot_settings)
+
+        # Обновляем глобальные настройки
+        from config.settings import settings
+        settings.openai_use_proxy = use_proxy
+
+        return True
+
+    async def get_proxy_settings(self) -> dict:
+        """
+        Получить текущие настройки прокси
+
+        Returns:
+            Словарь с настройками прокси
+        """
+        bot_settings = await self.settings_repo.get_settings()
+        
+        return {
+            "use_proxy": bot_settings.openai_use_proxy,
+            "proxy_url": bot_settings.openai_proxy_url,
+            "proxy_key": bot_settings.openai_proxy_key,
+            "proxy_key_set": bool(bot_settings.openai_proxy_key),
+        }
+
+    async def sync_settings_with_env(self) -> bool:
+        """
+        Принудительная синхронизация настроек с .env файлом
+        
+        Returns:
+            True если синхронизация прошла успешно
+        """
+        try:
+            from config.settings import settings
+            
+            bot_settings = await self.settings_repo.get_settings()
+            needs_update = False
+            
+            # Проверяем все настройки
+            if bot_settings.openai_use_proxy != settings.openai_use_proxy:
+                bot_settings.openai_use_proxy = settings.openai_use_proxy
+                needs_update = True
+                
+            if bot_settings.openai_proxy_url != settings.openai_proxy_url:
+                bot_settings.openai_proxy_url = settings.openai_proxy_url
+                needs_update = True
+                
+            if bot_settings.openai_proxy_key != (settings.openai_proxy_key or ""):
+                bot_settings.openai_proxy_key = settings.openai_proxy_key or ""
+                needs_update = True
+            
+            if needs_update:
+                await self.settings_repo.update_settings(bot_settings)
+                
+                # Обновляем глобальные настройки
+                settings.openai_use_proxy = bot_settings.openai_use_proxy
+                settings.openai_proxy_url = bot_settings.openai_proxy_url
+                settings.openai_proxy_key = bot_settings.openai_proxy_key
+                
+                return True
+                
+            return False  # Ничего не изменилось
+            
+        except ImportError:
+            return False
