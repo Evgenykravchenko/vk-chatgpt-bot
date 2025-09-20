@@ -18,6 +18,10 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
+      # 0. Принудительно меняем владельца рабочей директории
+      - name: Change owner of workspace
+        run: sudo chown -R evgenkrav:evgenkrav ${{ github.workspace }}
+
       # 1. Клонируем репозиторий, чтобы получить доступ к файлу docker-compose.yml
       - name: Checkout repository
         uses: actions/checkout@v3
