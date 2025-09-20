@@ -5,6 +5,7 @@ services:
     image: ghcr.io/evgenykravchenko/vk-chatgpt-bot:latest
     container_name: vk_chatgpt_bot
     restart: unless-stopped
+    user: "1000:1000" # Запускаем контейнер от имени пользователя с UID 1000 (обычно evgenkrav)
     env_file:
       - .env
     volumes:
